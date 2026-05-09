@@ -162,9 +162,12 @@ func (s *PerformanceService) GetPerformance(ctx context.Context, cc string, peri
 			hasLastYear = true
 		}
 
-		totalAchieved += achieved
 		totalTarget += tgt
-		totalLastYear += ly
+		// Only include in YoY totals when both sides have data (apples-to-apples)
+		if ly > 0 {
+			totalAchieved += achieved
+			totalLastYear += ly
+		}
 
 		if prod.Category == model.CategoryFuel {
 			fuelAchieved += achieved

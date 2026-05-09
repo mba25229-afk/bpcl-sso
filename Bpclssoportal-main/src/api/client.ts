@@ -66,6 +66,10 @@ export const api = {
   getLeaderboard: (territory: string) =>
     request(`/api/v1/competition/leaderboard?territory=${encodeURIComponent(territory)}`),
 
+  // Crystal scoring engine — rank_overall for this CC + month
+  getCrystalScorecard: (cc: string, month: string) =>
+    request(`/api/v1/portal/${cc}/scorecard?month=${month}`),
+
   getDealerScorecard: (cc: string, competitionId: string) =>
     request(`/api/v1/competition/dealers/${cc}/scorecard?competition_id=${competitionId}`),
 

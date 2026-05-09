@@ -1,2 +1,32 @@
+# Environment
 .env
-node_modules
+.env.local
+
+# Dependencies
+node_modules/
+
+# OS
+.DS_Store
+**/.DS_Store
+Thumbs.db
+
+# Runtime / logs
+bpcl-portal-api/api.log
+bpcl-portal-api/uploads/
+
+# Build artefacts
+bin/
+dist/
+Bpclssoportal-main/dist/
+
+# Test artefacts
+test-results/
+playwright-report/
+
+# Tooling
+.playwright-mcp/
+graphify-out/
+
+# Large data / docs files (committed separately if needed)
+docs/crystal/*.xlsx
+docs/crystal/*.xls

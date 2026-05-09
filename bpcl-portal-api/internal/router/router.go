@@ -6,9 +6,14 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/bpcl/portal-api/internal/admin"
 	"github.com/bpcl/portal-api/internal/config"
+	"github.com/bpcl/portal-api/internal/crystal/ingest"
+	"github.com/bpcl/portal-api/internal/dashboard"
 	"github.com/bpcl/portal-api/internal/handler"
 	"github.com/bpcl/portal-api/internal/middleware"
+	"github.com/bpcl/portal-api/internal/portal"
+	"github.com/bpcl/portal-api/internal/scoring"
 )
 
 // dbPinger is satisfied by *pgxpool.Pool.
@@ -18,7 +23,18 @@ type dbPinger interface {
 
 // New builds and returns the fully-wired HTTP handler.
 // Middleware chain (outermost → innermost): RequestID → Logger → CORS → RateLimit → [Auth on protected].
-func New(h *handler.Handler, cfg *config.Config, authSvc middleware.TokenValidator, db dbPinger) http.Handler {
+func New(
+	h *handler.Handler,
+	cfg *config.Config,
+	authSvc middleware.TokenValidator,
+	db dbPinger,
+	crystalH *ingest.Handler,
+	adminH *admin.Handler,
+	portalH *portal.Handler,
+	dashH *dashboard.Handler,
+	dashRepo *dashboard.Repository,
+	scoringH *scoring.Handler,
+) http.Handler {
 	mux := http.NewServeMux()
 
 	authMw := middleware.Auth(authSvc)
@@ -63,6 +79,34 @@ func New(h *handler.Handler, cfg *config.Config, authSvc middleware.TokenValidat
 
 	// ── Protected: uploads (Delhi Master) ─────────────────────────────────────
 	mux.Handle("POST /api/v1/uploads/delhi-master", authMw(http.HandlerFunc(h.HandleDelhiMasterUpload)))
+
+	// ── Crystal ingest routes (auth added in Chunk 2b) ─────────────────────────
+	mux.HandleFunc("POST /api/v1/ingest/daily-bulk", crystalH.DailyBulk)
+	mux.HandleFunc("POST /api/v1/ingest/mak-ge", crystalH.MAKGE)
+	mux.HandleFunc("POST /api/v1/ingest/google-rating", crystalH.GoogleRating)
+	mux.HandleFunc("POST /api/v1/targets/bulk", crystalH.TargetsBulk)
+
+	// ── Crystal Chunk 3: scoring engine ───────────────────────────────────────
+	mux.Handle("POST /api/v1/scoring/compute", authMw(http.HandlerFunc(scoringH.Compute)))
+
+	// ── Crystal Chunk 4: admin portal ─────────────────────────────────────────
+	mux.Handle("GET /api/v1/admin/dealers", authMw(http.HandlerFunc(adminH.ListDealers)))
+	mux.Handle("PUT /api/v1/admin/dealers/{cc_code}", authMw(http.HandlerFunc(adminH.ToggleDealer)))
+	mux.Handle("GET /api/v1/admin/competition-periods", authMw(http.HandlerFunc(adminH.ListPeriods)))
+	mux.Handle("POST /api/v1/admin/competition-periods", authMw(http.HandlerFunc(adminH.CreatePeriod)))
+	mux.Handle("PATCH /api/v1/admin/competition-periods/{month_year}/activate", authMw(http.HandlerFunc(adminH.ActivatePeriod)))
+	mux.Handle("GET /api/v1/admin/targets/{month_year}", authMw(http.HandlerFunc(adminH.GetTargets)))
+	mux.Handle("GET /api/v1/admin/ingest/summary", authMw(http.HandlerFunc(adminH.IngestSummary)))
+	mux.Handle("GET /api/v1/admin/mak-ge/{month_year}", authMw(http.HandlerFunc(adminH.GetMAKGE)))
+	mux.Handle("GET /api/v1/admin/manual-scores/{month_year}", authMw(http.HandlerFunc(adminH.GetManualScores)))
+	mux.Handle("POST /api/v1/admin/manual-scores", authMw(http.HandlerFunc(adminH.SaveManualScores)))
+
+	// ── Crystal Chunk 5: SSO portal ───────────────────────────────────────────
+	mux.Handle("GET /api/v1/portal/{cc_code}/scorecard", authMw(http.HandlerFunc(portalH.ScoreCard)))
+
+	// ── Crystal Chunk 6: dashboard ────────────────────────────────────────────
+	mux.Handle("GET /api/v1/dashboard", authMw(http.HandlerFunc(dashH.GetDashboard)))
+	mux.Handle("GET /api/v1/dashboard/export", authMw(dashboard.ExportHandler(dashRepo)))
 
 	// ── Global middleware wraps the entire mux ─────────────────────────────────
 	rl := middleware.NewRateLimiter(cfg.RateLimitRPM)

@@ -9,10 +9,17 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/bpcl/portal-api/internal/admin"
 	"github.com/bpcl/portal-api/internal/config"
+	"github.com/bpcl/portal-api/internal/crystal/dealer"
+	"github.com/bpcl/portal-api/internal/crystal/ingest"
+	"github.com/bpcl/portal-api/internal/crystal/period"
+	"github.com/bpcl/portal-api/internal/dashboard"
 	"github.com/bpcl/portal-api/internal/handler"
+	"github.com/bpcl/portal-api/internal/portal"
 	"github.com/bpcl/portal-api/internal/repository"
 	"github.com/bpcl/portal-api/internal/router"
+	"github.com/bpcl/portal-api/internal/scoring"
 	"github.com/bpcl/portal-api/internal/service"
 )
 
@@ -76,8 +83,34 @@ func main() {
 	// Handler.
 	h := handler.New(authSvc, outletSvc, perfSvc, targetSvc, uploadSvc, compSvc, marketShareSvc, userSvc)
 
+	// Crystal ingest wiring.
+	dealerRepo := dealer.New(pool)
+	periodRepo := period.New(pool)
+	ingestRepo := ingest.NewRepository(pool)
+	ingestSvc := ingest.NewService(ingestRepo, dealerRepo, periodRepo)
+	crystalH := ingest.NewHandler(ingestSvc)
+
+	// Crystal Chunk 3: scoring engine.
+	actualsRepo := scoring.NewActualsRepo(pool)
+	paramsRepo := scoring.NewParamsRepo(pool)
+	scoreRepo := scoring.NewScoreRepository(pool)
+	scoringEngine := scoring.NewEngine(actualsRepo, paramsRepo, scoreRepo)
+	scoringH := scoring.NewHandler(scoringEngine)
+
+	// Crystal Chunk 4: admin portal.
+	adminRepo := admin.NewRepository(pool)
+	adminH := admin.NewHandler(adminRepo)
+
+	// Crystal Chunk 5: SSO portal.
+	portalRepo := portal.NewRepository(pool)
+	portalH := portal.NewHandler(portalRepo)
+
+	// Crystal Chunk 6: dashboard.
+	dashRepo := dashboard.NewRepository(pool)
+	dashH := dashboard.NewHandler(dashRepo)
+
 	// Router.
-	r := router.New(h, cfg, authSvc, pool)
+	r := router.New(h, cfg, authSvc, pool, crystalH, adminH, portalH, dashH, dashRepo, scoringH)
 
 	// HTTP server.
 	srv := &http.Server{

@@ -6,6 +6,7 @@ import { KPIStrip } from './components/KPIStrip';
 import { PerformanceTable } from './components/PerformanceTable';
 import { AnalysisCharts } from './components/AnalysisCharts';
 import { AnalysisKPIs } from './components/AnalysisKPIs';
+import { BreakdownCards } from './components/BreakdownCards';
 import { ManagerProfile } from './components/ManagerProfile';
 import { SetTargetsModal } from './components/SetTargetsModal';
 import { DealerScorecard } from './components/DealerScorecard';
@@ -105,34 +106,40 @@ function buildNonFuelRows(nonFuel: any[]): PerformanceRow[] {
   return [...rows, totals];
 }
 
-function buildKPIData(perf: any) {
-  const fuel = perf.fuel ?? [];
-  const nf = perf.non_fuel ?? [];
-  const fuelAvgAch =
-    fuel.length > 0
-      ? fuel.reduce((s: number, f: any) => s + (f.target_hit_pct ?? 0), 0) / fuel.length
-      : 0;
-  const nfAvgAch =
-    nf.length > 0
-      ? nf.reduce((s: number, f: any) => s + (f.target_hit_pct ?? 0), 0) / nf.length
-      : 0;
-  const fuelPct = Math.round(fuelAvgAch);
-  const nfPct = Math.round(nfAvgAch);
+function buildKPIData(perf: any, trend: any[] = [], rank?: string) {
+  // MoM growth: compare current month total_achieved vs previous month
+  let momGrowth = '+0.0';
+  if (trend.length >= 2) {
+    const sorted = [...trend].sort((a, b) => a.period.localeCompare(b.period));
+    const prev = sorted[sorted.length - 2]?.total_achieved ?? 0;
+    const curr = sorted[sorted.length - 1]?.total_achieved ?? 0;
+    if (prev && prev !== 0) {
+      const pct = ((curr - prev) / prev) * 100;
+      momGrowth = `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}`;
+    }
+  }
 
+  const yoy = perf.yoy_growth_pct ?? 0;
   return {
-    totalRevenue: ((perf.total_revenue_cr ?? 0) * 100).toFixed(1),
+    rank: rank ?? '–',
     targetAchievement: (perf.target_achievement_pct ?? 0).toFixed(1),
-    yoyGrowth: `${(perf.yoy_growth_pct ?? 0) >= 0 ? '+' : ''}${(perf.yoy_growth_pct ?? 0).toFixed(1)}`,
-    fuelVsNonFuel: `${fuelPct}:${nfPct}`,
+    yoyGrowth: `${yoy >= 0 ? '+' : ''}${yoy.toFixed(1)}`,
+    momGrowth,
   };
 }
 
-function buildROData(outlet: any, cc: string) {
+function buildROData(outlet: any, cc: string, crystalRank?: string | null, totalDealers?: number | null) {
+  // outlet.rank stores letter grade (A+/A/B) from legacy system.
+  // Fall back to Crystal competition rank formatted as "#N of M" if no grade set.
+  const letterGrade = outlet.rating ?? (outlet.rank && String(outlet.rank).trim() ? outlet.rank : null);
+  const competitionRating = crystalRank
+    ? `#${crystalRank}${totalDealers ? ' of ' + totalDealers : ''}`
+    : null;
   return {
     name: outlet.name ?? cc,
     location: outlet.location ?? '',
     ccNumber: outlet.cc_number ?? cc,
-    rank: outlet.rank ?? '–',
+    rating: letterGrade ?? competitionRating ?? '–',
   };
 }
 
@@ -334,6 +341,9 @@ export default function App({ onLogout }: { onLogout: () => void }) {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardData | null>(null);
+  const [trendPeriods, setTrendPeriods] = useState<any[]>([]);
+  const [crystalRank, setCrystalRank] = useState<string | null>(null);
+  const [crystalTotalDealers, setCrystalTotalDealers] = useState<number | null>(null);
   const [marketShareStatus, setMarketShareStatus] = useState<MarketShareStatus | null>(null);
   const [currentCC, setCurrentCC] = useState('');
   const [currentPeriod, setCurrentPeriod] = useState('');
@@ -354,6 +364,8 @@ export default function App({ onLogout }: { onLogout: () => void }) {
     setError(null);
     setCurrentCC(cleanCC);
     setCurrentPeriod(period);
+    setCrystalRank(null);
+    setCrystalTotalDealers(null);
 
     try {
       const [outletRes, perfRes] = await Promise.all([
@@ -397,16 +409,25 @@ export default function App({ onLogout }: { onLogout: () => void }) {
         setTargets({ fuel, nonFuel });
       }
 
-      // Fetch analysis and leaderboard in background (don't block dashboard)
+      // Fetch analysis, leaderboard, trend, and Crystal rank in background
       const territory = outletRes.territory_code ?? 'DELHI-W';
+      // Crystal scorecard gives competition rank_overall for this CC + month
+      const crystalMonth = period + '-01'; // "2026-05" → "2026-05-01"
       Promise.all([
         api.getAnalysis(cleanCC, fromPeriod, period).catch(() => null),
         api.getLeaderboard(territory).catch(() => null),
         api.getMarketShareStatus(COMPETITION_ID).catch(() => null),
-      ]).then(([analysisRes, leaderboardRes, msStatusRes]) => {
+        api.getTrend(cleanCC, 3).catch(() => null),
+        api.getCrystalScorecard(cleanCC, crystalMonth).catch(() => null),
+      ]).then(([analysisRes, leaderboardRes, msStatusRes, trendRes, scorecardRes]) => {
         if (analysisRes) setAnalysisData({ analysis: analysisRes, performance: perfRes });
         if (leaderboardRes) setLeaderboardData({ competition: leaderboardRes });
         if (msStatusRes) setMarketShareStatus(msStatusRes);
+        if (trendRes?.periods) setTrendPeriods(trendRes.periods);
+        if (scorecardRes?.rank_overall) {
+          setCrystalRank(String(scorecardRes.rank_overall));
+          setCrystalTotalDealers(scorecardRes.total_dealers ?? null);
+        }
       });
     } catch (err: any) {
       if (err.status === 403) {
@@ -479,13 +500,24 @@ export default function App({ onLogout }: { onLogout: () => void }) {
 
   const hasDashboard = !!dashboardData;
   console.log('DASHBOARD DATA STATE:', JSON.stringify(dashboardData, null, 2));
-  const roData = hasDashboard ? buildROData(dashboardData.outlet, currentCC) : null;
-  const kpiData = hasDashboard ? buildKPIData(dashboardData.performance) : null;
+  const roData = hasDashboard ? buildROData(dashboardData.outlet, currentCC, crystalRank, crystalTotalDealers) : null;
+  // Prefer Crystal competition rank; fall back to outlet.rank (legacy letter grade)
+  const kpiData = hasDashboard
+    ? buildKPIData(dashboardData.performance, trendPeriods, crystalRank ?? dashboardData.outlet?.rank)
+    : null;
   const fuelRows = hasDashboard ? buildFuelRows(dashboardData.performance.fuel ?? []) : [];
   const nonFuelRows = hasDashboard ? buildNonFuelRows(dashboardData.performance.non_fuel ?? []) : [];
 
   console.log('FUEL ROWS:', JSON.stringify(fuelRows));
   console.log('NON_FUEL ROWS:', JSON.stringify(nonFuelRows));
+
+  // Breakdown totals for BreakdownCards in Analysis tab
+  const fuelTotal    = fuelRows.find((r: any) => r.isTotal);
+  const nonFuelTotal = nonFuelRows.find((r: any) => r.isTotal);
+  const fuelAchieved    = fuelTotal?.achieved    ?? 0;
+  const fuelTarget      = fuelTotal?.target      ?? 0;
+  const nonFuelAchieved = nonFuelTotal?.achieved ?? 0;
+  const nonFuelTarget   = nonFuelTotal?.target   ?? 0;
 
   const hasAnalysis = !!analysisData;
   const analysisKPIs = hasAnalysis ? buildAnalysisKPIs(analysisData.analysis, analysisData.performance) : null;
@@ -542,6 +574,11 @@ export default function App({ onLogout }: { onLogout: () => void }) {
                 {hasAnalysis ? (
                   <>
                     <AnalysisKPIs data={analysisKPIs} />
+                    <BreakdownCards
+                      fuelData={{ achieved: fuelAchieved, target: fuelTarget }}
+                      nonFuelData={{ achieved: nonFuelAchieved, target: nonFuelTarget }}
+                      paymentData={{ achieved: 0, target: 0 }}
+                    />
                     <AnalysisCharts {...chartData} />
                   </>
                 ) : (
@@ -570,20 +607,21 @@ export default function App({ onLogout }: { onLogout: () => void }) {
               </>
             )}
 
-            {activeTab === 'territory' && (
-              <TerritoryView
-                onSelectDealer={(cc: string) => {
-                  setCurrentCC(cc);
-                  setActiveTab('dashboard');
-                }}
-              />
-            )}
-
-            {activeTab === 'admin' && <AdminView />}
           </div>
         )}
 
-        {!hasDashboard && !loading && !error && (
+        {activeTab === 'territory' && (
+          <TerritoryView
+            onSelectDealer={(cc: string) => {
+              setCurrentCC(cc);
+              setActiveTab('dashboard');
+            }}
+          />
+        )}
+
+        {activeTab === 'admin' && <AdminView />}
+
+        {!hasDashboard && !loading && !error && activeTab !== 'territory' && activeTab !== 'admin' && (
           <div className="mt-16 text-center">
             <div
               className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center"
