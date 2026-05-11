@@ -18,6 +18,11 @@ type Config struct {
 	LogLevel     string
 	Env          string
 	RateLimitRPM int
+	SMTPHost     string
+	SMTPPort     string
+	SMTPUser     string
+	SMTPPass     string
+	SMTPFrom     string
 }
 
 func Load() (*Config, error) {
@@ -52,6 +57,11 @@ func Load() (*Config, error) {
 		LogLevel:     viper.GetString("BPCL_LOG_LEVEL"),
 		Env:          viper.GetString("BPCL_ENV"),
 		RateLimitRPM: viper.GetInt("BPCL_RATE_LIMIT_RPM"),
+		SMTPHost:     viper.GetString("BPCL_SMTP_HOST"),
+		SMTPPort:     viper.GetString("BPCL_SMTP_PORT"),
+		SMTPUser:     viper.GetString("BPCL_SMTP_USER"),
+		SMTPPass:     viper.GetString("BPCL_SMTP_PASS"),
+		SMTPFrom:     viper.GetString("BPCL_SMTP_FROM"),
 	}, nil
 }
 
