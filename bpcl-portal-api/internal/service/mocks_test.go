@@ -43,6 +43,13 @@ func (m *mockUserRepo) Create(ctx context.Context, u *model.User) error {
 func (m *mockUserRepo) Update(ctx context.Context, id uuid.UUID, name string, role model.UserRole, territory *string, isActive bool) error {
 	return m.Called(ctx, id, name, role, territory, isActive).Error(0)
 }
+func (m *mockUserRepo) GetByEmail(ctx context.Context, email string) (*model.User, error) {
+	args := m.Called(ctx, email)
+	if u := args.Get(0); u != nil {
+		return u.(*model.User), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
 func (m *mockUserRepo) UpdatePassword(ctx context.Context, id uuid.UUID, hash string) error {
 	return m.Called(ctx, id, hash).Error(0)
 }
