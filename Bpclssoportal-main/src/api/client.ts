@@ -25,7 +25,7 @@ async function request(path: string, options: RequestInit = {}): Promise<any> {
   if (res.status === 401) {
     localStorage.removeItem('bpcl_token');
     localStorage.removeItem('bpcl_user');
-    window.location.href = '/';
+    window.dispatchEvent(new CustomEvent('bpcl-session-expired'));
     throw Object.assign(new Error('Unauthorized'), { status: 401, code: 'UNAUTHORIZED' }) as ApiError;
   }
 
@@ -105,4 +105,16 @@ export const api = {
 
   resetPassword: (id: string, body: { new_password: string }) =>
     request(`/api/v1/admin/users/${id}/reset-password`, { method: 'PUT', body: JSON.stringify(body) }),
+
+  forgotPassword: (email: string) =>
+    request('/api/v1/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+
+  resetForgottenPassword: (email: string, otp: string, newPassword: string) =>
+    request('/api/v1/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp, new_password: newPassword }),
+    }),
 };

@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { api } from '../api/client';
 import bpclLogo from '../imports/Bharat_Petroleum-Logo.wine.png';
+import { ForgotPasswordModal } from './components/ForgotPasswordModal';
 
 export function LoginPage({ onLogin }: { onLogin: () => void }) {
   const [employeeId, setEmployeeId] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showForgot, setShowForgot] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,7 +20,7 @@ export function LoginPage({ onLogin }: { onLogin: () => void }) {
     setError('');
     try {
       const data = await api.login(employeeId, password);
-      localStorage.setItem('bpcl_token', data.token);
+      localStorage.setItem('bpcl_token', data.access_token);
       localStorage.setItem('bpcl_user', JSON.stringify(data.user));
       onLogin();
     } catch (err: any) {
@@ -85,9 +87,17 @@ export function LoginPage({ onLogin }: { onLogin: () => void }) {
             >
               {loading ? 'Signing in…' : 'Sign In'}
             </button>
+            <button
+              type="button"
+              onClick={() => setShowForgot(true)}
+              className="w-full text-center text-sm text-gray-500 hover:text-gray-700 mt-1"
+            >
+              Forgot password?
+            </button>
           </form>
         </div>
       </div>
+      <ForgotPasswordModal open={showForgot} onClose={() => setShowForgot(false)} />
     </div>
   );
 }
