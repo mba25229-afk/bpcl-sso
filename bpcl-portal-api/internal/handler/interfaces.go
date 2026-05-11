@@ -13,6 +13,7 @@ import (
 type AuthServiceI interface {
 	Login(ctx context.Context, employeeID, password string) (*service.LoginResponse, error)
 	ValidateToken(tokenStr string) (*service.Claims, error)
+	RefreshAccessToken(refreshToken string) (*service.RefreshResponse, error)
 }
 
 type OutletServiceI interface {
@@ -47,4 +48,9 @@ type UserServiceI interface {
 	CreateUser(ctx context.Context, input service.CreateUserInput) (*model.User, error)
 	UpdateUser(ctx context.Context, id uuid.UUID, input service.UpdateUserInput) (*model.User, error)
 	ResetPassword(ctx context.Context, id uuid.UUID, input service.ResetPasswordInput) error
+}
+
+type OTPServiceI interface {
+	GenerateAndSend(ctx context.Context, email string) error
+	ResetPassword(ctx context.Context, email, otp, newPassword string) error
 }

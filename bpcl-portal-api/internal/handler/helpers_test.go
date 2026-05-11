@@ -12,7 +12,7 @@ import (
 
 func newHandler(auth *mockAuthSvc, outlet *mockOutletSvc, perf *mockPerfSvc, target *mockTargetSvc, upload *mockUploadSvc, comp *mockCompSvc, marketShare *mockMarketShareSvc) *handler.Handler {
 	users := &mockUserSvc{}
-	return handler.New(auth, outlet, perf, target, upload, comp, marketShare, users)
+	return handler.New(auth, outlet, perf, target, upload, comp, marketShare, users, nil)
 }
 
 func newRequest(method, path string, body http.Handler) *http.Request {

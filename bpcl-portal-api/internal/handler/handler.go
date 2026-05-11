@@ -1,14 +1,15 @@
 package handler
 
 type Handler struct {
-	Auth         AuthServiceI
-	Outlet       OutletServiceI
-	Performance  PerformanceServiceI
-	Target       TargetServiceI
-	Upload       UploadServiceI
-	Competition  CompetitionServiceI
-	MarketShare  MarketShareServiceI
+	Auth        AuthServiceI
+	Outlet      OutletServiceI
+	Performance PerformanceServiceI
+	Target      TargetServiceI
+	Upload      UploadServiceI
+	Competition CompetitionServiceI
+	MarketShare MarketShareServiceI
 	Users       UserServiceI
+	OTP         OTPServiceI
 }
 
 func New(
@@ -20,6 +21,7 @@ func New(
 	competition CompetitionServiceI,
 	marketShare MarketShareServiceI,
 	users UserServiceI,
+	otp OTPServiceI,
 ) *Handler {
 	return &Handler{
 		Auth:        auth,
@@ -30,5 +32,6 @@ func New(
 		Competition: competition,
 		MarketShare: marketShare,
 		Users:       users,
+		OTP:         otp,
 	}
 }
