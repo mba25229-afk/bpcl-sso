@@ -11,6 +11,7 @@ import (
 type UserRepository interface {
 	GetByEmployeeID(ctx context.Context, employeeID string) (*model.User, error)
 	GetByID(ctx context.Context, id uuid.UUID) (*model.User, error)
+	GetByEmail(ctx context.Context, email string) (*model.User, error)
 	List(ctx context.Context, role, territory string, limit, offset int) ([]*model.User, int, error)
 	Create(ctx context.Context, u *model.User) error
 	Update(ctx context.Context, id uuid.UUID, name string, role model.UserRole, territory *string, isActive bool) error
@@ -54,4 +55,11 @@ type CompetitionRepository interface {
 
 type AuditRepository interface {
 	Log(ctx context.Context, userID uuid.UUID, action, cc string, payload any) error
+}
+
+type OTPRepository interface {
+	DeleteByEmail(ctx context.Context, email string) error
+	Insert(ctx context.Context, email, otpHash string, expiresAt time.Time) error
+	GetLatestUnused(ctx context.Context, email string) (otpHash string, expiresAt time.Time, err error)
+	MarkUsed(ctx context.Context, email string) error
 }

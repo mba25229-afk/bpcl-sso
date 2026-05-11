@@ -33,6 +33,11 @@ func (r *UserRepo) GetByID(ctx context.Context, id uuid.UUID) (*model.User, erro
 	return scanUser(row)
 }
 
+func (r *UserRepo) GetByEmail(ctx context.Context, email string) (*model.User, error) {
+	row := r.pool.QueryRow(ctx, userSelect+` WHERE email = $1`, email)
+	return scanUser(row)
+}
+
 func (r *UserRepo) UpdateLastLogin(ctx context.Context, id uuid.UUID) error {
 	now := time.Now()
 	_, err := r.pool.Exec(ctx,
