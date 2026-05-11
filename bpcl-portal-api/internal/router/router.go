@@ -8,7 +8,9 @@ import (
 
 	"github.com/bpcl/portal-api/internal/admin"
 	"github.com/bpcl/portal-api/internal/config"
+	"github.com/bpcl/portal-api/internal/crystal/health"
 	"github.com/bpcl/portal-api/internal/crystal/ingest"
+	"github.com/bpcl/portal-api/internal/crystal/mtd"
 	"github.com/bpcl/portal-api/internal/dashboard"
 	"github.com/bpcl/portal-api/internal/handler"
 	"github.com/bpcl/portal-api/internal/middleware"
@@ -34,6 +36,8 @@ func New(
 	dashH *dashboard.Handler,
 	dashRepo *dashboard.Repository,
 	scoringH *scoring.Handler,
+	healthH *health.Handler,
+	mtdH *mtd.Handler,
 ) http.Handler {
 	mux := http.NewServeMux()
 
@@ -42,6 +46,9 @@ func New(
 	// ── Public routes ──────────────────────────────────────────────────────────
 	mux.HandleFunc("GET /health", healthHandler(db))
 	mux.HandleFunc("POST /api/v1/auth/login", h.Login)
+	mux.HandleFunc("POST /api/v1/auth/refresh", h.Refresh) // must not be behind authMw
+	mux.HandleFunc("POST /api/v1/auth/forgot-password", h.ForgotPassword)
+	mux.HandleFunc("POST /api/v1/auth/reset-password", h.ResetForgottenPassword)
 
 	// ── Protected: auth ────────────────────────────────────────────────────────
 	mux.Handle("GET /api/v1/auth/me", authMw(http.HandlerFunc(h.Me)))
@@ -107,6 +114,15 @@ func New(
 	// ── Crystal Chunk 6: dashboard ────────────────────────────────────────────
 	mux.Handle("GET /api/v1/dashboard", authMw(http.HandlerFunc(dashH.GetDashboard)))
 	mux.Handle("GET /api/v1/dashboard/export", authMw(dashboard.ExportHandler(dashRepo)))
+
+	// ── Crystal health / cron monitoring ──────────────────────────────────────
+	mux.HandleFunc("POST /api/v1/health/cron-ping", healthH.CronPing) // no auth — internal ETL call
+	mux.Handle("GET /api/v1/health/cron-status", authMw(http.HandlerFunc(healthH.CronStatus)))
+
+	// ── Crystal MTD: dealers + actuals ────────────────────────────────────────
+	mux.Handle("GET /api/v1/crystal/dealers", authMw(http.HandlerFunc(mtdH.ListDealers)))
+	mux.Handle("GET /api/v1/crystal/dealers/{cc_code}/mtd", authMw(http.HandlerFunc(mtdH.GetMTD)))
+	mux.Handle("GET /api/v1/crystal/dashboard", authMw(http.HandlerFunc(mtdH.GetMTDDashboard)))
 
 	// ── Global middleware wraps the entire mux ─────────────────────────────────
 	rl := middleware.NewRateLimiter(cfg.RateLimitRPM)

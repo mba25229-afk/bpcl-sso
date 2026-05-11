@@ -12,7 +12,9 @@ import (
 	"github.com/bpcl/portal-api/internal/admin"
 	"github.com/bpcl/portal-api/internal/config"
 	"github.com/bpcl/portal-api/internal/crystal/dealer"
+	"github.com/bpcl/portal-api/internal/crystal/health"
 	"github.com/bpcl/portal-api/internal/crystal/ingest"
+	"github.com/bpcl/portal-api/internal/crystal/mtd"
 	"github.com/bpcl/portal-api/internal/crystal/period"
 	"github.com/bpcl/portal-api/internal/dashboard"
 	"github.com/bpcl/portal-api/internal/handler"
@@ -80,8 +82,19 @@ func main() {
 	marketShareSvc := service.NewMarketShareService(marketShareRepo, outletRepo, cfg.UploadDir)
 	userSvc := service.NewUserService(userRepo)
 
+	// OTP service.
+	otpRepo := repository.NewOTPRepo(pool)
+	emailSender := service.NewSMTPSender(service.SMTPConfig{
+		Host: cfg.SMTPHost,
+		Port: cfg.SMTPPort,
+		User: cfg.SMTPUser,
+		Pass: cfg.SMTPPass,
+		From: cfg.SMTPFrom,
+	})
+	otpSvc := service.NewOTPService(otpRepo, userRepo, emailSender)
+
 	// Handler.
-	h := handler.New(authSvc, outletSvc, perfSvc, targetSvc, uploadSvc, compSvc, marketShareSvc, userSvc)
+	h := handler.New(authSvc, outletSvc, perfSvc, targetSvc, uploadSvc, compSvc, marketShareSvc, userSvc, otpSvc)
 
 	// Crystal ingest wiring.
 	dealerRepo := dealer.New(pool)
@@ -109,8 +122,14 @@ func main() {
 	dashRepo := dashboard.NewRepository(pool)
 	dashH := dashboard.NewHandler(dashRepo)
 
+	// Crystal health / cron monitoring.
+	healthH := health.NewHandler(pool)
+
+	// Crystal MTD endpoints.
+	mtdH := mtd.NewHandler(pool)
+
 	// Router.
-	r := router.New(h, cfg, authSvc, pool, crystalH, adminH, portalH, dashH, dashRepo, scoringH)
+	r := router.New(h, cfg, authSvc, pool, crystalH, adminH, portalH, dashH, dashRepo, scoringH, healthH, mtdH)
 
 	// HTTP server.
 	srv := &http.Server{
