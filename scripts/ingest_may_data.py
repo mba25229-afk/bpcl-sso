@@ -97,14 +97,17 @@ def empty_stats():
 
 
 def upsert(cur, sql, values, stats):
-    """Execute one upsert row. Increments inserted/updated/errors in stats."""
+    """Execute one upsert row using a savepoint so a DB error doesn't abort the transaction."""
     try:
+        cur.execute("SAVEPOINT sp")
         cur.execute(sql, values)
+        cur.execute("RELEASE SAVEPOINT sp")
         if cur.rowcount == 0:
             stats['skipped'] += 1
         else:
             stats['inserted'] += 1
     except Exception as e:
+        cur.execute("ROLLBACK TO SAVEPOINT sp")
         stats['errors'] += 1
         print(f'    [ERROR] {e} | values={values}')
 
