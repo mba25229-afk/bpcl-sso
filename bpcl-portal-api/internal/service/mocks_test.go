@@ -115,6 +115,10 @@ func (m *mockPerfRepo) GetTrend(ctx context.Context, cc string, months int) ([]*
 	}
 	return nil, args.Error(1)
 }
+func (m *mockPerfRepo) GetDailySums(ctx context.Context, cc string, monthStart time.Time) (model.DailySums, error) {
+	args := m.Called(ctx, cc, monthStart)
+	return args.Get(0).(model.DailySums), args.Error(1)
+}
 
 // ── TargetRepository mock ────────────────────────────────────────────────────
 

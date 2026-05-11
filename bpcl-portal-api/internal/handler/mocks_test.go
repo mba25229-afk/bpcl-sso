@@ -29,6 +29,13 @@ func (m *mockAuthSvc) ValidateToken(token string) (*service.Claims, error) {
 	}
 	return nil, args.Error(1)
 }
+func (m *mockAuthSvc) RefreshAccessToken(refreshToken string) (*service.RefreshResponse, error) {
+	args := m.Called(refreshToken)
+	if r := args.Get(0); r != nil {
+		return r.(*service.RefreshResponse), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
 
 // ── Outlet service mock ──────────────────────────────────────────────────────
 

@@ -26,8 +26,9 @@ func TestLoginHandler_Success(t *testing.T) {
 
 	tc := "DELHI-01"
 	loginResp := &service.LoginResponse{
-		Token: "tok.en.here",
-		User:  &model.User{ID: uuid.New(), EmployeeID: "EMP001", TerritoryCode: &tc},
+		AccessToken:  "acc.tok.here",
+		RefreshToken: "ref.tok.here",
+		User:         &model.User{ID: uuid.New(), EmployeeID: "EMP001", TerritoryCode: &tc},
 	}
 	authSvc.On("Login", mock.Anything, "EMP001", "secret123").Return(loginResp, nil)
 
@@ -36,7 +37,8 @@ func TestLoginHandler_Success(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 	var got map[string]any
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &got))
-	assert.Equal(t, "tok.en.here", got["token"])
+	assert.Equal(t, "acc.tok.here", got["access_token"])
+	assert.Equal(t, "ref.tok.here", got["refresh_token"])
 }
 
 func TestLoginHandler_WrongCredentials(t *testing.T) {

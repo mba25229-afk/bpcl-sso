@@ -143,6 +143,29 @@ func numericToFloat64Ptr(n pgtype.Numeric) *float64 {
 	return &f.Float64
 }
 
+// GetDailySums sums kl/count from cr_daily_ms, cr_daily_speed, cr_daily_ufill for the given month.
+func (r *PerformanceRepo) GetDailySums(ctx context.Context, cc string, monthStart time.Time) (model.DailySums, error) {
+	monthEnd := monthStart.AddDate(0, 1, 0)
+	var sums model.DailySums
+
+	_ = r.pool.QueryRow(ctx,
+		`SELECT COALESCE(SUM(kl),0) FROM cr_daily_ms WHERE cc_code=$1 AND txn_date>=$2 AND txn_date<$3`,
+		cc, monthStart, monthEnd,
+	).Scan(&sums.MSKL)
+
+	_ = r.pool.QueryRow(ctx,
+		`SELECT COALESCE(SUM(kl),0) FROM cr_daily_speed WHERE cc_code=$1 AND txn_date>=$2 AND txn_date<$3`,
+		cc, monthStart, monthEnd,
+	).Scan(&sums.SpeedKL)
+
+	_ = r.pool.QueryRow(ctx,
+		`SELECT COALESCE(SUM(count),0) FROM cr_daily_ufill WHERE cc_code=$1 AND txn_date>=$2 AND txn_date<$3`,
+		cc, monthStart, monthEnd,
+	).Scan(&sums.UfillCnt)
+
+	return sums, nil
+}
+
 func (r *PerformanceRepo) GetTrend(ctx context.Context, cc string, months int) ([]*model.TrendRow, error) {
 	now := time.Now()
 	to := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)

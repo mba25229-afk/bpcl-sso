@@ -23,9 +23,16 @@ type Claims struct {
 }
 
 type LoginResponse struct {
-	Token string     `json:"token"`
-	User  *model.User `json:"user"`
+	AccessToken  string      `json:"access_token"`
+	RefreshToken string      `json:"refresh_token"`
+	User         *model.User `json:"user"`
 }
+
+type RefreshResponse struct {
+	AccessToken string `json:"access_token"`
+}
+
+const refreshExpiry = 7 * 24 * time.Hour
 
 type AuthService struct {
 	users     UserRepository
@@ -71,7 +78,56 @@ func (s *AuthService) Login(ctx context.Context, employeeID, password string) (*
 
 	_ = s.users.UpdateLastLogin(ctx, user.ID)
 
-	return &LoginResponse{Token: tokenStr, User: user}, nil
+	refreshClaims := &Claims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   user.ID.String(),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(refreshExpiry)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+		UserID: user.ID,
+		Role:   string(user.Role),
+	}
+	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
+	refreshStr, err := refreshToken.SignedString(s.jwtSecret)
+	if err != nil {
+		return nil, fmt.Errorf("auth: sign refresh token: %w", err)
+	}
+
+	return &LoginResponse{AccessToken: tokenStr, RefreshToken: refreshStr, User: user}, nil
+}
+
+// RefreshAccessToken verifies a refresh token and returns a new short-lived access token.
+func (s *AuthService) RefreshAccessToken(refreshTokenStr string) (*RefreshResponse, error) {
+	token, err := jwt.ParseWithClaims(refreshTokenStr, &Claims{}, func(t *jwt.Token) (any, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("auth: unexpected signing method")
+		}
+		return s.jwtSecret, nil
+	})
+	if err != nil || !token.Valid {
+		return nil, model.ErrUnauthorized
+	}
+	claims, ok := token.Claims.(*Claims)
+	if !ok {
+		return nil, model.ErrUnauthorized
+	}
+
+	newClaims := &Claims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   claims.Subject,
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(s.jwtExpiry)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+		UserID:        claims.UserID,
+		Role:          claims.Role,
+		TerritoryCode: claims.TerritoryCode,
+	}
+	newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, newClaims)
+	newTokenStr, err := newToken.SignedString(s.jwtSecret)
+	if err != nil {
+		return nil, fmt.Errorf("auth: sign access token: %w", err)
+	}
+	return &RefreshResponse{AccessToken: newTokenStr}, nil
 }
 
 func (s *AuthService) ValidateToken(tokenStr string) (*Claims, error) {

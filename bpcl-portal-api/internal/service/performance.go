@@ -32,6 +32,7 @@ type PerformanceResponse struct {
 	YoYGrowthPct          *float64                  `json:"yoy_growth_pct"`
 	FuelAchieved          float64                   `json:"fuel_achieved"`
 	NonFuelAchieved       float64                   `json:"non_fuel_achieved"`
+	UfillCount            int64                     `json:"ufill_count"`
 }
 
 type MonthlyDataPoint struct {
@@ -100,6 +101,8 @@ func (s *PerformanceService) GetPerformance(ctx context.Context, cc string, peri
 	if err != nil {
 		return nil, err
 	}
+	// Fetch MTD sums from crystal daily tables; override MS and SPEED records.
+	dailySums, _ := s.performance.GetDailySums(ctx, cc, period)
 
 	targetByProduct := make(map[int16]float64, len(tgts))
 	for _, t := range tgts {
@@ -139,6 +142,17 @@ func (s *PerformanceService) GetPerformance(ctx context.Context, cc string, peri
 			row.LastYear = rec.LastYear
 			row.VolumeKL = rec.VolumeKL
 		}
+		// Override MS and SPEED achieved values with sums from crystal daily tables.
+		if id == 1 && dailySums.MSKL > 0 {
+			v := dailySums.MSKL
+			row.Achieved = &v
+			row.VolumeKL = &v
+		}
+		if id == 3 && dailySums.SpeedKL > 0 {
+			v := dailySums.SpeedKL
+			row.Achieved = &v
+			row.VolumeKL = &v
+		}
 		if tgt > 0 {
 			row.Target = &tgt
 		}
@@ -153,8 +167,8 @@ func (s *PerformanceService) GetPerformance(ctx context.Context, cc string, peri
 		}
 
 		achieved := 0.0
-		if rec != nil && rec.Achieved != nil {
-			achieved = *rec.Achieved
+		if row.Achieved != nil {
+			achieved = *row.Achieved
 		}
 		ly := 0.0
 		if rec != nil && rec.LastYear != nil {
@@ -187,6 +201,7 @@ func (s *PerformanceService) GetPerformance(ctx context.Context, cc string, peri
 		TotalRevenueCr:  totalAchieved / 10_000_000,
 		FuelAchieved:    fuelAchieved,
 		NonFuelAchieved: nonFuelAchieved,
+		UfillCount:      dailySums.UfillCnt,
 	}
 	if hasTarget && totalTarget > 0 {
 		pct := (totalAchieved / totalTarget) * 100

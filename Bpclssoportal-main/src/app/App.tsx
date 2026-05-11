@@ -146,11 +146,14 @@ function buildROData(outlet: any, cc: string, crystalRank?: string | null, total
 function buildAnalysisKPIs(analysis: any, perf: any) {
   const fuelGrowth = analysis.category_growth?.find((c: any) => c.category === 'fuel')?.growth_pct ?? 0;
   const nfGrowth = analysis.category_growth?.find((c: any) => c.category === 'non_fuel')?.growth_pct ?? 0;
+  // UFill growth: compare current ufill_count vs last-year ufill (not tracked in perf, use 0 when unknown)
+  const ufillCurrent = perf?.ufill_count ?? 0;
+  const ufillLY = perf?.ufill_count_ly ?? 0;
+  const ufillGrowth = ufillLY > 0 ? parseFloat((((ufillCurrent - ufillLY) / ufillLY) * 100).toFixed(1)) : 0;
   return {
     fuelYoY: parseFloat(fuelGrowth.toFixed(1)),
     nonFuelYoY: parseFloat(nfGrowth.toFixed(1)),
-    volumeGrowth: parseFloat((perf?.yoy_growth_pct ?? 0).toFixed(1)),
-    revenueGrowth: parseFloat((perf?.yoy_growth_pct ?? 0).toFixed(1)),
+    ufillGrowth,
   };
 }
 
@@ -577,7 +580,7 @@ export default function App({ onLogout }: { onLogout: () => void }) {
                     <BreakdownCards
                       fuelData={{ achieved: fuelAchieved, target: fuelTarget }}
                       nonFuelData={{ achieved: nonFuelAchieved, target: nonFuelTarget }}
-                      paymentData={{ achieved: 0, target: 0 }}
+                      ufillData={{ achieved: dashboardData?.performance?.ufill_count ?? 0, target: 0 }}
                     />
                     <AnalysisCharts {...chartData} />
                   </>

@@ -31,6 +31,8 @@ type PerformanceRepository interface {
 	GetDateRange(ctx context.Context, cc string, from, to time.Time) ([]*model.PerformanceRecord, error)
 	GetTrend(ctx context.Context, cc string, months int) ([]*model.TrendRow, error)
 	Upsert(ctx context.Context, rec *model.PerformanceRecord) error
+	// GetDailySums returns month-to-date sums from cr_daily_ms, cr_daily_speed, cr_daily_ufill.
+	GetDailySums(ctx context.Context, cc string, monthStart time.Time) (model.DailySums, error)
 }
 
 type TargetRepository interface {

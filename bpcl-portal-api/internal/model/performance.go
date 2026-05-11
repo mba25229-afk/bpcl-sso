@@ -59,3 +59,10 @@ type TrendResponse struct {
 	Name    string      `json:"name"`
 	Periods []TrendRow  `json:"periods"`
 }
+
+// DailySums holds monthly totals from crystal daily tables (cr_daily_ms, cr_daily_speed, cr_daily_ufill).
+type DailySums struct {
+	MSKL     float64
+	SpeedKL  float64
+	UfillCnt int64
+}

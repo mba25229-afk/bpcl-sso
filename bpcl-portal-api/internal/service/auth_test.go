@@ -45,7 +45,8 @@ func TestAuthService_Login_Success(t *testing.T) {
 
 	resp, err := svc.Login(context.Background(), "EMP001", "secret123")
 	require.NoError(t, err)
-	assert.NotEmpty(t, resp.Token)
+	assert.NotEmpty(t, resp.AccessToken)
+	assert.NotEmpty(t, resp.RefreshToken)
 	assert.Equal(t, user.ID, resp.User.ID)
 
 	users.AssertExpectations(t)
@@ -95,7 +96,7 @@ func TestAuthService_ValidateToken_Success(t *testing.T) {
 	resp, err := svc.Login(context.Background(), "EMP001", "secret123")
 	require.NoError(t, err)
 
-	claims, err := svc.ValidateToken(resp.Token)
+	claims, err := svc.ValidateToken(resp.AccessToken)
 	require.NoError(t, err)
 	assert.Equal(t, user.ID, claims.UserID)
 	assert.Equal(t, string(user.Role), claims.Role)

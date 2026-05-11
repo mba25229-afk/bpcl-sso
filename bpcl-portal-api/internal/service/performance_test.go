@@ -34,6 +34,7 @@ func TestPerformanceService_GetPerformance_Success(t *testing.T) {
 
 	outlets.On("GetByCC", ctx, "123456").Return(outlet, nil)
 	perf.On("GetByPeriod", ctx, "123456", period).Return(recs, nil)
+	perf.On("GetDailySums", ctx, "123456", period).Return(model.DailySums{}, nil)
 	tgts.On("GetByPeriod", ctx, "123456", period).Return(targets, nil)
 
 	resp, err := svc.GetPerformance(ctx, "123456", period, userID)
