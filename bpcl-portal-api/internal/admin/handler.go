@@ -175,3 +175,25 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
 }
+
+type ETLTriggerResponse struct {
+	Status  string `json:"status"`
+	Detail  string `json:"detail,omitempty"`
+	Message string `json:"message"`
+}
+
+func (h *Handler) TriggerETL(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, 200, ETLTriggerResponse{
+		Status:  "ok",
+		Message: "ETL is managed via standalone binary. Use 'go run etl/cmd/etl/main.go' or set up cron.",
+	})
+}
+
+func (h *Handler) GetETLStatus(w http.ResponseWriter, r *http.Request) {
+	rows, err := h.repo.GetLastETLRun(r.Context())
+	if err != nil {
+		writeError(w, 500, err.Error())
+		return
+	}
+	writeJSON(w, 200, rows)
+}

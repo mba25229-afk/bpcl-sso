@@ -73,6 +73,9 @@ func (s *stubRepo) UpsertManualScores(ctx context.Context, monthYear time.Time, 
 	s.savedScores = rows
 	return s.saveErr
 }
+func (s *stubRepo) GetLastETLRun(ctx context.Context) (map[string]any, error) {
+	return map[string]any{"status": "never_run", "message": "No ETL runs recorded"}, nil
+}
 
 func newHandler(repo *stubRepo) *admin.Handler {
 	return admin.NewHandler(repo)

@@ -117,4 +117,10 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ email, otp, new_password: newPassword }),
     }),
+
+  triggerETL: () =>
+    request('/api/v1/admin/etl/trigger', { method: 'POST' }),
+
+  getETLStatus: () =>
+    request('/api/v1/admin/etl/status'),
 };

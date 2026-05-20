@@ -124,6 +124,10 @@ func New(
 	mux.Handle("GET /api/v1/crystal/dealers/{cc_code}/mtd", authMw(http.HandlerFunc(mtdH.GetMTD)))
 	mux.Handle("GET /api/v1/crystal/dashboard", authMw(http.HandlerFunc(mtdH.GetMTDDashboard)))
 
+	// ── ETL: Google Sheets sync ───────────────────────────────────────────────
+	mux.Handle("POST /api/v1/admin/etl/trigger", authMw(http.HandlerFunc(adminH.TriggerETL)))
+	mux.Handle("GET /api/v1/admin/etl/status", authMw(http.HandlerFunc(adminH.GetETLStatus)))
+
 	// ── Global middleware wraps the entire mux ─────────────────────────────────
 	rl := middleware.NewRateLimiter(cfg.RateLimitRPM)
 	return middleware.SecurityHeaders(

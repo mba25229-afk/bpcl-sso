@@ -1,7 +1,8 @@
-import { Search, Calendar, Upload, ChevronLeft, ChevronRight, History } from 'lucide-react';
+import { Search, Calendar, Upload, ChevronLeft, ChevronRight, History, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { format, startOfMonth } from 'date-fns';
 import { FileHistoryModal } from './FileHistoryModal';
+import { api } from '../../api/client';
 
 interface FileHistoryItem {
   id: string;
@@ -17,6 +18,9 @@ export function InputSection({ onFetch }: { onFetch: (ccNumber: string, selected
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [fileHistory, setFileHistory] = useState<FileHistoryItem[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [etlLoading, setEtlLoading] = useState(false);
+  const [etlStatus, setEtlStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [etlError, setEtlError] = useState<string | null>(null);
 
   const calendarRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -60,6 +64,22 @@ export function InputSection({ onFetch }: { onFetch: (ccNumber: string, selected
 
   const handleDeleteHistory = (id: string) => {
     setFileHistory(fileHistory.filter(item => item.id !== id));
+  };
+
+  const handleETLSync = async () => {
+    setEtlLoading(true);
+    setEtlStatus('idle');
+    setEtlError(null);
+    try {
+      await api.triggerETL();
+      setEtlStatus('success');
+      setTimeout(() => setEtlStatus('idle'), 3000);
+    } catch (err: any) {
+      setEtlStatus('error');
+      setEtlError(err.message || 'ETL sync failed');
+    } finally {
+      setEtlLoading(false);
+    }
   };
 
   const selectMonth = (month: number) => {
@@ -166,33 +186,30 @@ export function InputSection({ onFetch }: { onFetch: (ccNumber: string, selected
             Fetch Data
           </button>
 
-          {/* Upload Excel */}
+          {/* Sync from Google Sheets */}
           <div className="flex items-center gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
+            {etlStatus === 'success' ? (
+              <div className="flex items-center gap-2 px-4 py-3 bg-green-50 border border-green-200 rounded-lg">
+                <CheckCircle size={20} className="text-green-600" />
+                <span className="text-green-700 text-sm">Synced!</span>
+              </div>
+            ) : etlStatus === 'error' ? (
+              <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-lg">
+                <AlertCircle size={20} className="text-red-600" />
+                <span className="text-red-700 text-sm truncate max-w-[150px]">{etlError || 'Failed'}</span>
+              </div>
+            ) : null}
             <button
-              onClick={() => fileInputRef.current?.click()}
-              className="px-4 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
+              onClick={handleETLSync}
+              disabled={etlLoading}
+              className="px-4 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 disabled:opacity-50"
             >
-              <Upload size={20} />
-              <span>{uploadedFile ? uploadedFile.name.slice(0, 15) + '...' : 'Upload Excel'}</span>
-            </button>
-            <button
-              onClick={() => setShowHistory(true)}
-              className="p-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors relative"
-              title="File History"
-            >
-              <History size={20} />
-              {fileHistory.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full text-xs flex items-center justify-center text-white" style={{ backgroundColor: '#007BC9' }}>
-                  {fileHistory.length}
-                </span>
+              {etlLoading ? (
+                <RefreshCw size={20} className="animate-spin" />
+              ) : (
+                <RefreshCw size={20} />
               )}
+              <span>{etlLoading ? 'Syncing...' : 'Sync from Google'}</span>
             </button>
           </div>
         </div>

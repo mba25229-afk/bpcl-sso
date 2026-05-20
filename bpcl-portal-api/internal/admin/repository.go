@@ -21,6 +21,7 @@ type RepositoryInterface interface {
 	GetMAKGEReadings(ctx context.Context, monthYear time.Time) ([]MAKGERow, error)
 	GetManualScores(ctx context.Context, monthYear time.Time) ([]ManualScoreRow, error)
 	UpsertManualScores(ctx context.Context, monthYear time.Time, rows []ManualScoreRow) error
+	GetLastETLRun(ctx context.Context) (map[string]any, error)
 }
 
 type Repository struct{ pool *pgxpool.Pool }
@@ -299,4 +300,37 @@ func gradeNumeric(grade string) float64 {
 	default:
 		return 5
 	}
+}
+
+type ETLRLogRow struct {
+	ID        string    `json:"id"`
+	RunAt     time.Time `json:"run_at"`
+	Status    string    `json:"status"`
+	Detail    string    `json:"detail"`
+	Duration  int       `json:"duration_ms"`
+	Source    string    `json:"source"`
+}
+
+func (r *Repository) GetLastETLRun(ctx context.Context) (map[string]any, error) {
+	var row ETLRLogRow
+	err := r.pool.QueryRow(ctx, `
+		SELECT id::text, run_at, status, COALESCE(detail,''), COALESCE(duration_ms,0), COALESCE(source,'')
+		FROM cr_etl_log
+		ORDER BY run_at DESC
+		LIMIT 1
+	`).Scan(&row.ID, &row.RunAt, &row.Status, &row.Detail, &row.Duration, &row.Source)
+	if err != nil {
+		if err.Error() == "no rows in result set" {
+			return map[string]any{"status": "never_run", "message": "No ETL runs recorded"}, nil
+		}
+		return nil, err
+	}
+	return map[string]any{
+		"id":         row.ID,
+		"run_at":     row.RunAt.Format(time.RFC3339),
+		"status":     row.Status,
+		"detail":     row.Detail,
+		"duration":   row.Duration,
+		"source":     row.Source,
+	}, nil
 }
