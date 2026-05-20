@@ -1,0 +1,14 @@
+DROP VIEW IF EXISTS cr_dealer_total_scores;
+DROP TABLE IF EXISTS cr_dealer_scores CASCADE;
+DROP TABLE IF EXISTS cr_scoring_params CASCADE;
+DROP TABLE IF EXISTS cr_sangam_data CASCADE;
+DROP TABLE IF EXISTS cr_google_ratings CASCADE;
+DROP TABLE IF EXISTS cr_mak_ge_readings CASCADE;
+DROP TABLE IF EXISTS cr_daily_hsd CASCADE;
+DROP TABLE IF EXISTS cr_daily_speed CASCADE;
+DROP TABLE IF EXISTS cr_daily_ms CASCADE;
+DROP TABLE IF EXISTS cr_daily_qoc CASCADE;
+DROP TABLE IF EXISTS cr_daily_ufill CASCADE;
+DROP TABLE IF EXISTS cr_monthly_targets CASCADE;
+DROP TABLE IF EXISTS cr_competition_periods CASCADE;
+DROP TABLE IF EXISTS cr_dealers CASCADE;
