@@ -28,6 +28,7 @@ test('logout clears session', async ({ page }) => {
   if (await logoutBtn.isVisible()) {
     await logoutBtn.click()
     await page.waitForTimeout(1000)
-    expect(page.url()).toContain('login') || expect(page.url()).toBe('http://localhost:5173/')
+    const url = page.url()
+    expect(url.includes('login') || url === 'http://localhost:5173/').toBe(true)
   }
 })

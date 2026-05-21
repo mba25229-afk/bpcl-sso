@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS cr_etl_log;

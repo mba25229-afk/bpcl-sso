@@ -1,0 +1,89 @@
+services:
+  # ── PostgreSQL 16 ─────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: bpcl-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-bpcl}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-bpcl_secret}
+      POSTGRES_DB: ${DB_NAME:-bpcl_portal}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-bpcl} -d ${DB_NAME:-bpcl_portal}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - bpcl-network
+
+  # ── Go Backend API ────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: bpcl-backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    env_file:
+      - ./backend/.env
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-bpcl}
+      DB_PASSWORD: ${DB_PASSWORD:-bpcl_secret}
+      DB_NAME: ${DB_NAME:-bpcl_portal}
+      BPCL_DB_URL: postgresql://${DB_USER:-bpcl}:${DB_PASSWORD:-bpcl_secret}@postgres:5432/${DB_NAME:-bpcl_portal}?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      JWT_EXPIRY: ${JWT_EXPIRY:-24h}
+      CORS_ORIGINS: http://localhost:5173
+      PORT: 8080
+      ENV: development
+      LOG_LEVEL: debug
+      RATE_LIMIT_RPM: 100
+      UPLOAD_DIR: /tmp/uploads
+      MAX_UPLOAD_MB: 10
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - bpcl-network
+
+  # ── React Frontend (dev mode with hot reload) ─────────────────────────────
+  frontend:
+    image: node:22-alpine
+    container_name: bpcl-frontend
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      VITE_API_URL: http://localhost:8080
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - bpcl-network
+
+volumes:
+  pg_data:
+    driver: local
+
+networks:
+  bpcl-network:
+    driver: bridge
